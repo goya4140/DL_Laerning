@@ -9,33 +9,78 @@ AG News 是一个新闻标题+摘要的 4 分类数据集：
 
 训练集 120,000 条，测试集 7,600 条，文本长度适中，适合学习 RNN 序列建模。
 
+数据集在首次运行时从互联网自动下载（约 30MB），之后从本地缓存加载。
 需要安装：pip install torchtext
 """
 
 import os
+import csv
 import pickle
+import tarfile
+import urllib.request
 
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 
-try:
-    from torchtext.datasets import AG_NEWS
-    from torchtext.data.utils import get_tokenizer
-    from torchtext.vocab import build_vocab_from_iterator
-except ImportError as e:
-    raise ImportError(
-        "请先安装 torchtext：pip install torchtext\n"
-        "建议与 PyTorch 版本匹配，参考 https://github.com/pytorch/text"
-    ) from e
+# 消除 torchtext 弃用警告（必须在 torchtext 子模块 import 之前调用）
+import torchtext
+torchtext.disable_torchtext_deprecation_warning()
+
+from torchtext.data.utils import get_tokenizer
+from torchtext.vocab import build_vocab_from_iterator
 
 
-# AG News 类别（torchtext 返回 1-indexed，内部统一转为 0-indexed）
+# AG News 类别（CSV 标签为 1-indexed，内部统一转为 0-indexed）
 CLASSES = ["World", "Sports", "Business", "Sci/Tech"]
 NUM_CLASSES = 4
 
 # 分词器（基础英文：小写 + 标点切分，无需额外模型）
 _tokenizer = get_tokenizer("basic_english")
+
+# AG News tgz 下载地址（fast.ai 公共镜像）
+_AG_NEWS_URL = "https://s3.amazonaws.com/fast-ai-nlp/ag_news_csv.tgz"
+
+
+# ──────────────────────────────────────────────
+# 数据集下载与解析
+# ──────────────────────────────────────────────
+
+def _download_agnews(data_dir: str):
+    """首次运行时下载并解压 AG News CSV（约 30MB），后续直接读本地文件"""
+    train_path = os.path.join(data_dir, "ag_news_csv", "train.csv")
+    test_path  = os.path.join(data_dir, "ag_news_csv", "test.csv")
+
+    if os.path.exists(train_path) and os.path.exists(test_path):
+        return train_path, test_path
+
+    os.makedirs(data_dir, exist_ok=True)
+    print(f"下载 AG News 数据集（约 30MB）: {_AG_NEWS_URL}")
+    tgz_path = os.path.join(data_dir, "ag_news_csv.tgz")
+    urllib.request.urlretrieve(_AG_NEWS_URL, tgz_path)
+
+    print("解压数据集...")
+    with tarfile.open(tgz_path, "r:gz") as f:
+        f.extractall(data_dir)
+    os.remove(tgz_path)
+    print("AG News 数据集准备完成\n")
+
+    return train_path, test_path
+
+
+def _read_csv(csv_path: str):
+    """读取 AG News CSV，返回 list of (label_1indexed, text)
+
+    标签保持 1-4（与原始 torchtext AG_NEWS() 返回格式一致），
+    由 AGNewsDataset 在构建时统一转为 0-3。
+    """
+    data = []
+    with open(csv_path, "r", encoding="utf-8") as f:
+        for row in csv.reader(f):
+            label = int(row[0])          # 保留 1-4，AGNewsDataset 负责减 1
+            text  = row[1] + " " + row[2]  # title + description 拼接
+            data.append((label, text))
+    return data
 
 
 # ──────────────────────────────────────────────
@@ -56,9 +101,9 @@ def build_vocab(data_dir: str, vocab_size: int):
         print(f"词汇表已从缓存加载（大小: {len(vocab)}）")
         return vocab
 
-    print("首次运行：下载 AG News 数据集并构建词汇表...")
-    train_iter = AG_NEWS(root=data_dir, split="train")
-    train_data = list(train_iter)   # 转为列表，允许多次遍历
+    print("首次运行：构建词汇表...")
+    train_path, _ = _download_agnews(data_dir)
+    train_data = _read_csv(train_path)
 
     vocab = build_vocab_from_iterator(
         _yield_tokens(train_data),
@@ -109,11 +154,10 @@ def _collate_fn(batch):
 def get_agnews_loaders(data_dir: str, vocab, max_len: int,
                        batch_size: int, num_workers: int = 2,
                        pin_memory: bool = True):
-    train_iter = AG_NEWS(root=data_dir, split="train")
-    test_iter  = AG_NEWS(root=data_dir, split="test")
+    train_path, test_path = _download_agnews(data_dir)
 
-    train_dataset = AGNewsDataset(list(train_iter), vocab, max_len)
-    test_dataset  = AGNewsDataset(list(test_iter),  vocab, max_len)
+    train_dataset = AGNewsDataset(_read_csv(train_path), vocab, max_len)
+    test_dataset  = AGNewsDataset(_read_csv(test_path),  vocab, max_len)
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True,

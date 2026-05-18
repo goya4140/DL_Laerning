@@ -19,7 +19,8 @@ import matplotlib.pyplot as plt
 
 from config import config
 from model import RNNClassifier, count_parameters
-from dataset import build_vocab, get_agnews_loaders, CLASSES, NUM_CLASSES, AG_NEWS, _tokenizer
+from dataset import (build_vocab, get_agnews_loaders, CLASSES, NUM_CLASSES,
+                     _download_agnews, _read_csv, _tokenizer)
 from train import get_device
 
 
@@ -106,8 +107,8 @@ def print_class_accuracy(confusion: np.ndarray):
 def predict_samples(model, vocab, device, data_dir: str, num_samples: int = 8):
     """从测试集中随机抽取样本，展示原文 + 标签预测结果"""
     model.eval()
-    test_iter = AG_NEWS(root=data_dir, split="test")
-    test_data = list(test_iter)
+    _, test_path = _download_agnews(data_dir)
+    test_data = _read_csv(test_path)
 
     indices = np.random.choice(len(test_data), size=num_samples, replace=False)
 
