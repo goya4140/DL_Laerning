@@ -20,6 +20,18 @@ from model import MLP
 from dataset import get_mnist_loaders
 
 
+def get_device(preference: str = "auto") -> torch.device:
+    """优先级：CUDA > MPS（Apple Silicon）> CPU"""
+    if preference == "auto":
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            return torch.device("mps")
+        else:
+            return torch.device("cpu")
+    return torch.device(preference)
+
+
 def evaluate_per_class(model, loader, device, num_classes=10):
     """统计每个类别的预测准确率"""
     model.eval()
@@ -109,7 +121,7 @@ def visualize_predictions(model, loader, device, num_samples=10, save_path="./pr
 
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = get_device(config.device)
     print(f"使用设备: {device}")
 
     # 加载模型

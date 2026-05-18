@@ -256,15 +256,64 @@ def cross_entropy(logits, target):
 
 ## 4. 快速开始
 
+### macOS（Apple Silicon M1/M2/M3/M4，默认）
+
 ```bash
-# 安装依赖
+# 1. 创建并激活虚拟环境
+python3 -m venv .venv && source .venv/bin/activate
+
+# 2. 安装 PyTorch（官方 pip 包已原生支持 MPS，无需额外操作）
 pip install torch torchvision matplotlib
 
-# 训练（自动下载 MNIST 数据集）
+# 3. 训练（自动检测 MPS，输出"使用设备: mps"）
 python train.py
 
-# 测试（需先完成训练）
+# 4. 测试
 python test.py
+```
+
+> MPS 是 Apple Silicon 的 GPU 加速框架，PyTorch >= 1.12 开始支持，速度比纯 CPU 快 3-5 倍。
+
+### Windows（NVIDIA GPU）
+
+```powershell
+# 1. 创建并激活虚拟环境
+python -m venv .venv
+.venv\Scripts\activate
+
+# 2. 安装 PyTorch（CUDA 12.1，按实际 CUDA 版本选择）
+pip install torch torchvision matplotlib --index-url https://download.pytorch.org/whl/cu121
+
+# 3. 训练（自动检测 CUDA，输出"使用设备: cuda"）
+python train.py
+
+# 4. 测试
+python test.py
+```
+
+### Windows（无 GPU，仅 CPU）
+
+```powershell
+# 1. 创建并激活虚拟环境
+python -m venv .venv
+.venv\Scripts\activate
+
+# 2. 安装 CPU 版 PyTorch
+pip install torch torchvision matplotlib
+
+# 3. 训练（输出"使用设备: cpu"，速度较慢但功能完整）
+python train.py
+```
+
+### 手动指定设备
+
+在 `config.py` 中修改 `device` 字段可强制指定设备：
+
+```python
+device = "auto"   # 默认：自动检测（CUDA > MPS > CPU）
+device = "mps"    # 强制使用 Apple Silicon GPU
+device = "cuda"   # 强制使用 NVIDIA GPU
+device = "cpu"    # 强制使用 CPU（调试用）
 ```
 
 ---
