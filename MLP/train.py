@@ -20,6 +20,23 @@ from model import MLP, count_parameters
 from dataset import get_mnist_loaders, show_dataset_info
 
 
+def get_device(preference: str = "auto") -> torch.device:
+    """
+    根据偏好和当前硬件自动选择计算设备。
+
+    优先级（auto 模式）：CUDA（NVIDIA）> MPS（Apple Silicon）> CPU
+    手动指定：直接传入 "cuda" / "mps" / "cpu"
+    """
+    if preference == "auto":
+        if torch.cuda.is_available():
+            return torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            return torch.device("mps")
+        else:
+            return torch.device("cpu")
+    return torch.device(preference)
+
+
 def train_one_epoch(model, loader, criterion, optimizer, device, epoch):
     """运行一个完整的训练 epoch，返回平均损失和准确率"""
     model.train()  # 开启训练模式（启用 Dropout、BatchNorm 使用批统计量）
@@ -73,12 +90,17 @@ def main():
     # 固定随机种子，保证实验可复现
     torch.manual_seed(config.seed)
 
-    # 自动选择设备
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # 自动选择设备（config.device 可手动指定，默认 "auto"）
+    device = get_device(config.device)
     print(f"使用设备: {device}\n")
 
+    # MPS 不支持 pin_memory，按设备动态设置
+    pin_memory = device.type == "cuda"
+
     # 数据加载
-    train_loader, test_loader = get_mnist_loaders(config.data_dir, config.batch_size, config.num_workers)
+    train_loader, test_loader = get_mnist_loaders(
+        config.data_dir, config.batch_size, config.num_workers, pin_memory=pin_memory
+    )
     show_dataset_info(train_loader, test_loader)
     print()
 

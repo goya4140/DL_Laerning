@@ -19,6 +19,13 @@ class Config:
     lr_step_size = 5             # 每隔多少 epoch 降低学习率
     lr_gamma = 0.5               # 学习率衰减倍率
 
+    # 设备配置
+    # "auto" 自动检测（优先级：CUDA > MPS > CPU）
+    # "mps"  Mac M 系列芯片（M1/M2/M3/M4）
+    # "cuda" NVIDIA GPU（Windows/Linux）
+    # "cpu"  仅 CPU（无 GPU 时的兜底）
+    device = "auto"
+
     # 其他
     seed = 42                    # 随机种子，保证实验可复现
     save_path = "./checkpoints/best_model.pth"  # 最优模型保存路径

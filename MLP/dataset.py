@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
 
-def get_mnist_loaders(data_dir: str, batch_size: int, num_workers: int = 2):
+def get_mnist_loaders(data_dir: str, batch_size: int, num_workers: int = 2, pin_memory: bool = True):
     """
     返回 MNIST 训练集和测试集的 DataLoader。
 
@@ -45,14 +45,14 @@ def get_mnist_loaders(data_dir: str, batch_size: int, num_workers: int = 2):
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
-        pin_memory=True,   # 将数据固定在内存中，加速 GPU 传输
+        pin_memory=pin_memory,  # 固定内存加速 GPU/CUDA 传输；MPS 不支持需传 False
     )
     test_loader = DataLoader(
         test_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
 
     return train_loader, test_loader
