@@ -17,6 +17,7 @@ Cora 是图神经网络研究中最经典的节点分类基准数据集：
 """
 
 import os
+import ssl
 import csv
 import pickle
 import tarfile
@@ -38,7 +39,28 @@ CLASSES = [
 ]
 NUM_CLASSES = 7
 
-_CORA_URL = "https://linqs-data.scu.edu/public/datasets/cora/cora.tgz"
+# 主 URL + 备用 URL（Python 3.9 macOS LibreSSL 与 linqs 服务器 TLS 握手可能失败）
+_CORA_URLS = [
+    "https://linqs-data.scu.edu/public/datasets/cora/cora.tgz",
+    "https://nrvis.com/download/data/labeled/cora.zip",  # 备用（zip 格式）
+]
+_CORA_PRIMARY_URL = _CORA_URLS[0]
+
+
+def _urlretrieve_ssl_relaxed(url: str, dest: str):
+    """下载文件，禁用 SSL 证书校验以兼容 Python 3.9 macOS LibreSSL。
+
+    Python 3.9 on macOS 使用 LibreSSL，与部分服务器的 TLS 握手失败（SSLEOFError）。
+    对公开数据集禁用证书校验是可接受的；生产环境中不建议这样做。
+    """
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, context=ctx) as resp:
+        with open(dest, "wb") as f:
+            f.write(resp.read())
 
 
 # ──────────────────────────────────────────────
@@ -54,9 +76,10 @@ def _download_cora(data_dir: str):
         return content_path, cites_path
 
     os.makedirs(data_dir, exist_ok=True)
-    print(f"下载 Cora 数据集（约 2MB）: {_CORA_URL}")
     tgz_path = os.path.join(data_dir, "cora.tgz")
-    urllib.request.urlretrieve(_CORA_URL, tgz_path)
+
+    print(f"下载 Cora 数据集（约 2MB）: {_CORA_PRIMARY_URL}")
+    _urlretrieve_ssl_relaxed(_CORA_PRIMARY_URL, tgz_path)
 
     print("解压数据集...")
     with tarfile.open(tgz_path, "r:gz") as f:
